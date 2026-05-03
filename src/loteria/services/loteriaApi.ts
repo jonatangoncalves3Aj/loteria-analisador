@@ -1,7 +1,7 @@
 import type { DrawResult, GameConfig } from '../types';
 
 const GITHUB_RAW_BASE =
-  'https://raw.githubusercontent.com/jonatangoncalves3/loteria-analisador/main/data';
+  'https://raw.githubusercontent.com/jonatangoncalves3Aj/loteria-analisador/main/data';
 
 export async function fetchLastNDraws(game: GameConfig, n = 200): Promise<DrawResult[]> {
   const url = `${GITHUB_RAW_BASE}/${game.id}.json`;
