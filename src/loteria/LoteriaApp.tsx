@@ -3,6 +3,7 @@ import { useLoteriaStore } from './store/useLoteriaStore';
 import { GameSelector } from './components/GameSelector';
 import { StatsPanel } from './components/StatsPanel';
 import { CombinationCard } from './components/CombinationCard';
+import { getDrawDaysLabel } from './utils/drawSchedule';
 
 export function LoteriaApp() {
   const {
@@ -14,17 +15,18 @@ export function LoteriaApp() {
     combinationCount,
     activeTab,
     historySize,
+    targetDateInput,
+    resolvedDrawDate,
     loadHistory,
     generateCombs,
     setCombinationCount,
     setActiveTab,
     setHistorySize,
+    setTargetDate,
   } = useLoteriaStore();
 
   useEffect(() => {
-    if (draws.length === 0 && !loading) {
-      loadHistory();
-    }
+    if (draws.length === 0 && !loading) loadHistory();
   }, []);
 
   return (
@@ -81,25 +83,50 @@ export function LoteriaApp() {
           <GameSelector />
         </section>
 
-        {/* Loading state */}
+        {/* Date picker */}
+        <section className="bg-white rounded-xl border border-gray-200 p-4">
+          <div className="flex items-start gap-4 flex-wrap">
+            <div className="flex-1 min-w-48">
+              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider block mb-1.5">
+                📅 Data do sorteio desejado
+              </label>
+              <input
+                type="date"
+                value={targetDateInput}
+                min={new Date().toISOString().split('T')[0]}
+                onChange={(e) => setTargetDate(e.target.value)}
+                className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 bg-white text-gray-800 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-gray-300"
+              />
+              <p className="text-xs text-gray-400 mt-1">
+                {selectedGame.name} sorteios: {getDrawDaysLabel(selectedGame)}
+              </p>
+            </div>
+            <div className={`flex-1 min-w-48 rounded-xl p-3 ${selectedGame.bgColor} text-white`}>
+              <p className="text-xs font-medium text-white/70">Próximo sorteio para essa data</p>
+              <p className="text-sm font-bold mt-0.5 capitalize">{resolvedDrawDate}</p>
+              <p className="text-xs text-white/70 mt-1">
+                As combinações serão geradas para este sorteio
+              </p>
+            </div>
+          </div>
+        </section>
+
+        {/* Loading */}
         {loading && (
           <div className="flex items-center justify-center py-12 gap-3 text-gray-500">
             <Spinner />
-            <span className="text-sm">Carregando histórico de concursos da Caixa...</span>
+            <span className="text-sm">Carregando histórico de concursos...</span>
           </div>
         )}
 
-        {/* Error state */}
+        {/* Error */}
         {error && !loading && (
           <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-sm text-red-700 flex items-start gap-2">
             <span>⚠️</span>
             <div>
               <p className="font-medium">Erro ao carregar dados</p>
               <p className="text-xs mt-0.5">{error}</p>
-              <button
-                onClick={loadHistory}
-                className="mt-2 text-xs underline hover:no-underline"
-              >
+              <button onClick={loadHistory} className="mt-2 text-xs underline hover:no-underline">
                 Tentar novamente
               </button>
             </div>
@@ -118,10 +145,7 @@ export function LoteriaApp() {
               <p className="text-sm text-white/80">{draws[0]?.date}</p>
               <div className="flex flex-wrap gap-1.5 mt-2">
                 {draws[0]?.numbers.slice(0, selectedGame.isSuperSete ? 7 : undefined).map((n, i) => (
-                  <span
-                    key={i}
-                    className="bg-white/20 text-white text-xs font-bold px-2 py-0.5 rounded-full"
-                  >
+                  <span key={i} className="bg-white/20 text-white text-xs font-bold px-2 py-0.5 rounded-full">
                     {selectedGame.isSuperSete ? `C${i + 1}:${n}` : n.toString().padStart(2, '0')}
                   </span>
                 ))}
@@ -141,7 +165,7 @@ export function LoteriaApp() {
                         : 'border-transparent text-gray-500 hover:text-gray-700'
                     }`}
                   >
-                    {tab === 'stats' ? `📊 Estatísticas` : `🎯 Combinações ${combinations.length > 0 ? `(${combinations.length})` : ''}`}
+                    {tab === 'stats' ? '📊 Estatísticas' : `🎯 Combinações${combinations.length > 0 ? ` (${combinations.length})` : ''}`}
                   </button>
                 ))}
               </nav>
@@ -154,14 +178,22 @@ export function LoteriaApp() {
                 {combinations.length === 0 ? (
                   <div className="text-center py-12 text-gray-400">
                     <p className="text-4xl mb-3">🎲</p>
-                    <p className="text-sm">Clique em "Gerar Combinações" para criar sugestões baseadas nas estatísticas.</p>
+                    <p className="text-sm font-medium text-gray-500">
+                      Sorteio selecionado: <span className="capitalize">{resolvedDrawDate}</span>
+                    </p>
+                    <p className="text-xs mt-2">Clique em "Gerar Combinações" para criar sugestões para este sorteio.</p>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {combinations.map((combo, i) => (
-                      <CombinationCard key={i} combination={combo} index={i} game={selectedGame} />
-                    ))}
-                  </div>
+                  <>
+                    <p className="text-xs text-gray-500 mb-3 capitalize">
+                      🗓 Combinações para o sorteio de: <strong>{combinations[0]?.targetDate}</strong>
+                    </p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {combinations.map((combo, i) => (
+                        <CombinationCard key={i} combination={combo} index={i} game={selectedGame} />
+                      ))}
+                    </div>
+                  </>
                 )}
               </div>
             )}
@@ -169,7 +201,6 @@ export function LoteriaApp() {
         )}
       </div>
 
-      {/* Footer disclaimer */}
       <footer className="text-center py-6 text-xs text-gray-400 px-4">
         ⚠️ Este app é apenas para fins informativos. Jogos de loteria envolvem sorte e não há garantia de acerto.
         Jogue com responsabilidade.

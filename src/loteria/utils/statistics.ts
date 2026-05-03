@@ -107,6 +107,7 @@ export function computeSuperSeteColumnStats(
       pickCount: 1,
       color: '',
       bgColor: '',
+      drawDays: [],
     };
     return computeStats(colDraws, config);
   });
