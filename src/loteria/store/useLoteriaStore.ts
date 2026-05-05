@@ -2,10 +2,23 @@ import { create } from 'zustand';
 import type { Combination, DrawResult, GameConfig, NumberStats } from '../types';
 import { GAMES } from '../types';
 import { fetchLastNDraws } from '../services/loteriaApi';
-import { computeDistribution, computeStats, computeSuperSeteColumnStats } from '../utils/statistics';
+import {
+  computeDistribution,
+  computeStats,
+  computeWeightedFreq,
+  computePairStats,
+  computeSumStats,
+  computeRangeDistribution,
+  computeSuperSeteColumnStats,
+} from '../utils/statistics';
 import { generateCombinations, generateSuperSeteCombinations } from '../utils/generator';
 import { getNextDrawDate, toInputDate, fromInputDate, formatDrawDate } from '../utils/drawSchedule';
-import type { DistributionStats } from '../utils/statistics';
+import type {
+  DistributionStats,
+  PairFrequency,
+  SumStats,
+  RangeDistribution,
+} from '../utils/statistics';
 
 interface LoteriaState {
   selectedGame: GameConfig;
@@ -13,14 +26,18 @@ interface LoteriaState {
   stats: NumberStats[];
   columnStats: NumberStats[][];
   distribution: DistributionStats;
+  pairStats: PairFrequency;
+  sumStats: SumStats;
+  rangeDist: RangeDistribution;
+  weightedFreq: Record<number, number>;
   combinations: Combination[];
   loading: boolean;
   error: string | null;
   historySize: number;
   combinationCount: number;
   activeTab: 'stats' | 'combinations';
-  targetDateInput: string;       // value of the date picker (YYYY-MM-DD)
-  resolvedDrawDate: string;      // formatted date of the resolved draw
+  targetDateInput: string;
+  resolvedDrawDate: string;
 
   selectGame: (game: GameConfig) => void;
   loadHistory: () => Promise<void>;
@@ -38,13 +55,19 @@ function resolveDrawDate(game: GameConfig, inputStr: string): string {
 }
 
 const todayInput = toInputDate(new Date());
+const emptySum: SumStats = { mean: 0, stdDev: 0, p10: 0, p90: 0 };
+const emptyDist: DistributionStats = { avgEven: 0, avgOdd: 0, avgConsecutive: 0, avgLow: 0, avgHigh: 0 };
 
 export const useLoteriaStore = create<LoteriaState>((set, get) => ({
   selectedGame: GAMES[0],
   draws: [],
   stats: [],
   columnStats: [],
-  distribution: { avgEven: 0, avgOdd: 0, avgConsecutive: 0, avgLow: 0, avgHigh: 0 },
+  distribution: emptyDist,
+  pairStats: {},
+  sumStats: emptySum,
+  rangeDist: { slots: [] },
+  weightedFreq: {},
   combinations: [],
   loading: false,
   error: null,
@@ -57,12 +80,9 @@ export const useLoteriaStore = create<LoteriaState>((set, get) => ({
   selectGame: (game) => {
     const { targetDateInput } = get();
     set({
-      selectedGame: game,
-      draws: [],
-      stats: [],
-      columnStats: [],
-      combinations: [],
-      error: null,
+      selectedGame: game, draws: [], stats: [], columnStats: [],
+      pairStats: {}, sumStats: emptySum, rangeDist: { slots: [] }, weightedFreq: {},
+      combinations: [], error: null,
       resolvedDrawDate: resolveDrawDate(game, targetDateInput),
     });
     get().loadHistory();
@@ -80,37 +100,41 @@ export const useLoteriaStore = create<LoteriaState>((set, get) => ({
       const stats = computeStats(draws, selectedGame);
       const distribution = computeDistribution(draws, selectedGame);
       const columnStats = selectedGame.isSuperSete ? computeSuperSeteColumnStats(draws) : [];
-      set({ draws, stats, columnStats, distribution, loading: false });
+      const pairStats = selectedGame.isSuperSete ? {} : computePairStats(draws);
+      const sumStats = selectedGame.isSuperSete ? emptySum : computeSumStats(draws);
+      const rangeDist = selectedGame.isSuperSete
+        ? { slots: [] }
+        : computeRangeDistribution(draws, selectedGame);
+      const weightedFreq = computeWeightedFreq(draws, selectedGame);
+      set({ draws, stats, columnStats, distribution, pairStats, sumStats, rangeDist, weightedFreq, loading: false });
     } catch {
       set({ loading: false, error: 'Erro ao carregar histórico de concursos.' });
     }
   },
 
   generateCombs: () => {
-    const { stats, columnStats, distribution, selectedGame, combinationCount, resolvedDrawDate } = get();
+    const {
+      stats, columnStats, distribution, selectedGame, combinationCount,
+      resolvedDrawDate, pairStats, sumStats, rangeDist, weightedFreq,
+    } = get();
     let combinations: Combination[];
     if (selectedGame.isSuperSete) {
       combinations = generateSuperSeteCombinations(columnStats, combinationCount);
     } else {
-      combinations = generateCombinations(stats, distribution, selectedGame, combinationCount);
+      combinations = generateCombinations(
+        stats, distribution, selectedGame, combinationCount,
+        pairStats, sumStats, rangeDist, weightedFreq,
+      );
     }
-    // Tag each combination with the target draw date
     combinations = combinations.map((c) => ({ ...c, targetDate: resolvedDrawDate }));
     set({ combinations, activeTab: 'combinations' });
   },
 
-  setHistorySize: (n) => {
-    set({ historySize: n });
-    get().loadHistory();
-  },
-
+  setHistorySize: (n) => { set({ historySize: n }); get().loadHistory(); },
   setCombinationCount: (n) => set({ combinationCount: n }),
-
   setActiveTab: (tab) => set({ activeTab: tab }),
-
   setTargetDate: (dateInput) => {
     const { selectedGame } = get();
-    const resolvedDrawDate = resolveDrawDate(selectedGame, dateInput);
-    set({ targetDateInput: dateInput, resolvedDrawDate, combinations: [] });
+    set({ targetDateInput: dateInput, resolvedDrawDate: resolveDrawDate(selectedGame, dateInput), combinations: [] });
   },
 }));

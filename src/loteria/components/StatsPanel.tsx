@@ -5,7 +5,7 @@ import { NumberHeatGrid } from './NumberHeatGrid';
 type SortKey = 'number' | 'frequency' | 'delay' | 'temp';
 
 export function StatsPanel() {
-  const { stats, draws, selectedGame, distribution, columnStats } = useLoteriaStore();
+  const { stats, draws, selectedGame, distribution, columnStats, sumStats, rangeDist } = useLoteriaStore();
   const [sortKey, setSortKey] = useState<SortKey>('frequency');
   const [sortAsc, setSortAsc] = useState(false);
   const [view, setView] = useState<'grid' | 'table'>('grid');
@@ -52,6 +52,72 @@ export function StatsPanel() {
           <StatCard label="Média pares/sorteio" value={distribution.avgEven.toFixed(1)} />
           <StatCard label="Média ímpares/sorteio" value={distribution.avgOdd.toFixed(1)} />
           <StatCard label="Média consecutivos" value={distribution.avgConsecutive.toFixed(1)} />
+        </div>
+      )}
+
+      {/* Sum stats */}
+      {sumStats.mean > 0 && (
+        <div className="bg-white rounded-xl border border-gray-200 p-4">
+          <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
+            📐 Faixa de Soma Histórica
+          </h3>
+          <div className="flex items-center gap-4 flex-wrap">
+            <div className="flex-1 min-w-48">
+              {/* Visual range bar */}
+              <div className="relative h-6 bg-gray-100 rounded-full overflow-hidden">
+                {(() => {
+                  const min = sumStats.p10;
+                  const max = sumStats.p90;
+                  const total = sumStats.p90 + sumStats.p10 * 0.5;
+                  const leftPct = (min / (min + max)) * 100;
+                  const widthPct = ((max - min) / (min + max)) * 100;
+                  return (
+                    <div
+                      className="absolute top-0 h-full bg-green-400/60 rounded-full"
+                      style={{ left: `${leftPct}%`, width: `${widthPct}%` }}
+                    />
+                  );
+                })()}
+                <div
+                  className="absolute top-0 h-full w-1 bg-green-600 rounded-full"
+                  style={{ left: `${(sumStats.mean / (sumStats.p10 + sumStats.p90)) * 100}%` }}
+                />
+              </div>
+              <div className="flex justify-between text-xs text-gray-400 mt-1">
+                <span>P10: {Math.round(sumStats.p10)}</span>
+                <span>Média: {Math.round(sumStats.mean)}</span>
+                <span>P90: {Math.round(sumStats.p90)}</span>
+              </div>
+            </div>
+            <div className="text-xs text-gray-500 text-right">
+              <p>Faixa ideal de soma</p>
+              <p className="font-bold text-gray-800 text-sm">
+                {Math.round(sumStats.p10)} – {Math.round(sumStats.p90)}
+              </p>
+              <p className="text-gray-400">±{Math.round(sumStats.stdDev)} desvio</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Range distribution */}
+      {rangeDist.slots.length > 0 && (
+        <div className="bg-white rounded-xl border border-gray-200 p-4">
+          <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
+            📊 Distribuição por Faixa (média histórica)
+          </h3>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            {rangeDist.slots.map((slot) => (
+              <div key={slot.label} className="bg-gray-50 rounded-lg p-2 text-center">
+                <p className="text-xs font-semibold text-gray-600">{slot.label}</p>
+                <p className="text-xl font-bold text-gray-800">{slot.avgCount.toFixed(1)}</p>
+                <p className="text-[10px] text-gray-400">dezenas/sorteio</p>
+              </div>
+            ))}
+          </div>
+          <p className="text-xs text-gray-400 mt-2">
+            O gerador tenta equilibrar as combinações respeitando essa distribuição.
+          </p>
         </div>
       )}
 

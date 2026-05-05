@@ -34,7 +34,26 @@ export function CombinationCard({ combination, index, game }: Props) {
             ))}
       </div>
 
-      <p className="text-xs text-gray-400">{combination.rationale}</p>
+      <div className="flex flex-wrap gap-1 mt-1">
+        {combination.rationale.split(' · ').map((part, i) => (
+          <span
+            key={i}
+            className={`text-[11px] px-2 py-0.5 rounded-full font-medium ${
+              part.includes('✓')
+                ? 'bg-green-50 text-green-700'
+                : part.includes('fora') || part.includes('longa')
+                ? 'bg-red-50 text-red-600'
+                : 'bg-gray-100 text-gray-500'
+            }`}
+          >
+            {part}
+          </span>
+        ))}
+      </div>
+
+      {combination.targetDate && (
+        <p className="text-[10px] text-gray-300 mt-2 capitalize">🗓 {combination.targetDate}</p>
+      )}
     </div>
   );
 }
