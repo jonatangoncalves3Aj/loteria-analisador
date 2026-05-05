@@ -1,19 +1,23 @@
 import { useState } from 'react';
 import { PCPApp } from './pcp/PCPApp';
 import { LoteriaApp } from './loteria/LoteriaApp';
+import MentalApp from './mental/App.jsx';
 
-type View = 'pcp' | 'loteria';
+type View = 'pcp' | 'loteria' | 'mental';
 
 export default function App() {
   const [view, setView] = useState<View>('loteria');
 
   return (
-    <div>
+    <div className={view === 'mental' ? '' : undefined}>
       <div className="flex gap-1 p-2 bg-gray-800 text-xs">
         <NavBtn label="🎰 Loteria" active={view === 'loteria'} onClick={() => setView('loteria')} />
-        <NavBtn label="📋 PCP" active={view === 'pcp'} onClick={() => setView('pcp')} />
+        <NavBtn label="📋 PCP"     active={view === 'pcp'}     onClick={() => setView('pcp')}     />
+        <NavBtn label="🧠 Mental"  active={view === 'mental'}  onClick={() => setView('mental')}  />
       </div>
-      {view === 'loteria' ? <LoteriaApp /> : <PCPApp />}
+      {view === 'loteria' && <LoteriaApp />}
+      {view === 'pcp'     && <PCPApp />}
+      {view === 'mental'  && <MentalApp />}
     </div>
   );
 }

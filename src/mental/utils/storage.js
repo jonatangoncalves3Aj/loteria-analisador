@@ -1,0 +1,24 @@
+// Helpers de localStorage com JSON automático
+
+export const storage = {
+  get(key, fallback = null) {
+    try {
+      const item = localStorage.getItem(key)
+      return item ? JSON.parse(item) : fallback
+    } catch {
+      return fallback
+    }
+  },
+
+  set(key, value) {
+    try {
+      localStorage.setItem(key, JSON.stringify(value))
+    } catch (e) {
+      console.warn('localStorage cheio:', e)
+    }
+  },
+
+  remove(key) {
+    localStorage.removeItem(key)
+  },
+}
