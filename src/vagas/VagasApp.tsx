@@ -23,7 +23,7 @@ export function VagasApp() {
   return (
     <div className="min-h-screen bg-gray-900 text-white">
       <div className="bg-gray-800 border-b border-gray-700 px-4 py-3">
-        <h2 className="text-sm font-bold text-white mb-1">Vagas — Engenheiro Civil</h2>
+        <h1 className="text-base font-bold text-white mb-2">Vagas Automatizada <span className="text-gray-500 font-normal text-sm">— Engenheiro Civil</span></h1>
         <div className="flex gap-1 flex-wrap">
           {TABS.map(t => (
             <button
