@@ -1,39 +1,28 @@
 import { useState } from 'react';
 import { useVagasStore } from '../store/useVagasStore';
+import { Copy, Check, Wand2 } from 'lucide-react';
 
-function gerarCarta(params: {
-  nome: string;
-  cargo: string;
-  empresa: string;
-  cidade: string;
-  resumo: string;
-  habilidades: string[];
-  anos: string;
-  motivacao: string;
-  crea: string;
+function gerarCarta(p: {
+  nome: string; cargo: string; empresa: string; cidade: string;
+  resumo: string; habilidades: string[]; anos: string; motivacao: string; crea: string;
 }): string {
-  const { nome, cargo, empresa, cidade, resumo, habilidades, anos, motivacao, crea } = params;
   const data = new Date().toLocaleDateString('pt-BR', { day: 'numeric', month: 'long', year: 'numeric' });
-  const hab = habilidades.slice(0, 5).join(', ');
+  const hab = p.habilidades.slice(0, 5).join(', ');
+  return `${p.cidade || '[Cidade]'}, ${data}
 
-  return `${cidade || '[Cidade]'}, ${data}
+Prezados(as) recrutadores(as) da ${p.empresa || '[Empresa]'},
 
-Prezados(as) recrutadores(as) da ${empresa || '[Empresa]'},
+Venho por meio desta carta apresentar minha candidatura à vaga de ${p.cargo || 'Engenheiro Civil'}.
 
-Venho por meio desta carta apresentar minha candidatura à vaga de ${cargo || 'Engenheiro Civil'} em sua empresa.
+${p.resumo || `Sou Engenheiro Civil com ${p.anos || 'X'} anos de experiência em projetos e gestão de obras.`}
 
-${resumo || `Sou Engenheiro Civil com ${anos || 'X'} anos de experiência na área, atuando em projetos de ${cargo || 'engenharia civil'}.`}
+Durante minha trajetória, desenvolvi sólidas competências em ${hab || 'diversas áreas da engenharia civil'}, sempre comprometido com a excelência técnica e a qualidade das entregas.${p.motivacao ? `\n\n${p.motivacao}` : ''}
 
-Durante minha trajetória profissional, desenvolvi sólidas competências em ${hab || 'diversas áreas da engenharia civil'}, sempre comprometido com a excelência técnica, os prazos e a qualidade das entregas.
-
-${motivacao ? `${motivacao}\n\n` : ''}Estou convicto de que meu perfil técnico e minha dedicação ao trabalho podem contribuir positivamente para os projetos e objetivos da ${empresa || '[Empresa]'}. Coloco-me à disposição para uma entrevista no momento que for mais conveniente para a equipe de recrutamento.
-
-Agradeço pela atenção e aguardo o retorno.
+Estou convicto de que meu perfil pode contribuir positivamente para os projetos da ${p.empresa || '[Empresa]'}. Coloco-me à disposição para uma entrevista no momento mais conveniente.
 
 Atenciosamente,
 
-${nome || '[Seu Nome]'}
-Engenheiro Civil${crea ? ` – ${crea}` : ''}`;
+${p.nome || '[Seu Nome]'}${p.crea ? `\n${p.crea}` : ''}`;
 }
 
 export function CartaTab() {
@@ -45,21 +34,22 @@ export function CartaTab() {
   const [motivacao, setMotivacao] = useState('');
   const [carta, setCarta] = useState('');
   const [copiado, setCopiado] = useState(false);
-  const [vagaSelecionada, setVagaSelecionada] = useState('');
+  const [vagaId, setVagaId] = useState('');
 
-  const handleGerarCarta = () => {
-    const texto = gerarCarta({
-      nome: perfil.nome,
-      cargo,
-      empresa,
-      cidade: perfil.cidade,
-      resumo: perfil.resumo,
-      habilidades: perfil.habilidades,
-      anos,
-      motivacao,
-      crea: perfil.crea,
-    });
-    setCarta(texto);
+  const temPerfil = !!(perfil.nome || perfil.resumo);
+
+  const handleVaga = (id: string) => {
+    setVagaId(id);
+    const v = candidaturas.find(c => c.id === id);
+    if (v) { setEmpresa(v.empresa); setCargo(v.cargo); }
+  };
+
+  const handleGerar = () => {
+    setCarta(gerarCarta({
+      nome: perfil.nome, cargo, empresa, cidade: perfil.cidade,
+      resumo: perfil.resumo, habilidades: perfil.habilidades,
+      anos, motivacao, crea: perfil.crea,
+    }));
   };
 
   const handleCopiar = () => {
@@ -68,135 +58,109 @@ export function CartaTab() {
     setTimeout(() => setCopiado(false), 2000);
   };
 
-  const handleSelecionarVaga = (id: string) => {
-    setVagaSelecionada(id);
-    const vaga = candidaturas.find(c => c.id === id);
-    if (vaga) {
-      setEmpresa(vaga.empresa);
-      setCargo(vaga.cargo);
-    }
-  };
-
-  const temPerfil = perfil.nome || perfil.resumo || perfil.habilidades.length > 0;
-
   return (
-    <div className="space-y-4 max-w-3xl">
+    <div className="space-y-4">
       {!temPerfil && (
-        <div className="bg-yellow-900 border border-yellow-700 rounded-lg p-3 text-xs text-yellow-200">
-          Dica: preencha seu <strong>Perfil</strong> primeiro para gerar cartas mais completas e personalizadas.
+        <div className="bg-yellow-950 border border-yellow-800 rounded-2xl p-4 flex gap-3">
+          <span className="text-xl">💡</span>
+          <div>
+            <p className="text-sm text-yellow-200 font-medium">Perfil incompleto</p>
+            <p className="text-xs text-yellow-400 mt-0.5">Preencha seu perfil para gerar cartas mais completas.</p>
+          </div>
         </div>
       )}
 
-      <section className="bg-gray-800 rounded-lg p-4">
-        <h3 className="text-sm font-semibold text-gray-300 mb-3 uppercase tracking-wide">Gerar Carta de Apresentação</h3>
+      {/* Layout split */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        {/* Formulário */}
+        <div className="bg-gray-800 rounded-2xl border border-gray-700 p-4 space-y-3">
+          <h3 className="text-sm font-semibold text-gray-200 flex items-center gap-2">
+            <Wand2 size={14} className="text-blue-400" />
+            Configurar carta
+          </h3>
 
-        <div className="space-y-3">
           {candidaturas.length > 0 && (
             <div>
-              <label className="block text-xs text-gray-400 mb-1">Usar dados de uma candidatura salva</label>
-              <select
-                value={vagaSelecionada}
-                onChange={e => handleSelecionarVaga(e.target.value)}
-                className="w-full bg-gray-700 border border-gray-600 rounded px-2 py-1.5 text-sm text-white"
-              >
+              <label className="block text-xs text-gray-500 mb-1.5">Usar dados de candidatura salva</label>
+              <select value={vagaId} onChange={e => handleVaga(e.target.value)}
+                className="w-full bg-gray-900 border border-gray-700 rounded-xl px-3 py-2 text-sm text-white">
                 <option value="">Preencher manualmente</option>
                 {candidaturas.map(c => (
-                  <option key={c.id} value={c.id}>{c.empresa} – {c.cargo}</option>
+                  <option key={c.id} value={c.id}>{c.empresa} — {c.cargo}</option>
                 ))}
               </select>
             </div>
           )}
 
           <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs text-gray-400 mb-1">Nome (do perfil)</label>
-              <input
-                value={perfil.nome || ''}
-                readOnly
-                className="w-full bg-gray-900 border border-gray-700 rounded px-2 py-1.5 text-sm text-gray-400 cursor-not-allowed"
-                placeholder="Cadastre no Perfil"
-              />
-            </div>
-            <div>
-              <label className="block text-xs text-gray-400 mb-1">Cidade (do perfil)</label>
-              <input
-                value={perfil.cidade || ''}
-                readOnly
-                className="w-full bg-gray-900 border border-gray-700 rounded px-2 py-1.5 text-sm text-gray-400 cursor-not-allowed"
-                placeholder="Cadastre no Perfil"
-              />
-            </div>
-            <div>
-              <label className="block text-xs text-gray-400 mb-1">Empresa *</label>
-              <input
-                value={empresa}
-                onChange={e => setEmpresa(e.target.value)}
-                placeholder="Nome da empresa"
-                className="w-full bg-gray-700 border border-gray-600 rounded px-2 py-1.5 text-sm text-white"
-              />
-            </div>
-            <div>
-              <label className="block text-xs text-gray-400 mb-1">Cargo *</label>
-              <input
-                value={cargo}
-                onChange={e => setCargo(e.target.value)}
-                placeholder="Cargo desejado"
-                className="w-full bg-gray-700 border border-gray-600 rounded px-2 py-1.5 text-sm text-white"
-              />
-            </div>
-            <div>
-              <label className="block text-xs text-gray-400 mb-1">Anos de experiência</label>
-              <input
-                value={anos}
-                onChange={e => setAnos(e.target.value)}
-                placeholder="Ex: 5"
-                className="w-full bg-gray-700 border border-gray-600 rounded px-2 py-1.5 text-sm text-white"
-              />
-            </div>
+            <ReadOnly label="Seu nome" value={perfil.nome} placeholder="Cadastre no Perfil" />
+            <ReadOnly label="Cidade" value={perfil.cidade} placeholder="Cadastre no Perfil" />
+            <CI label="Empresa *" value={empresa} onChange={setEmpresa} placeholder="Nome da empresa" />
+            <CI label="Cargo *" value={cargo} onChange={setCargo} />
+            <CI label="Anos de experiência" value={anos} onChange={setAnos} placeholder="Ex: 5" />
           </div>
 
           <div>
-            <label className="block text-xs text-gray-400 mb-1">
-              Por que quer trabalhar nessa empresa? <span className="text-gray-600">(opcional)</span>
-            </label>
-            <textarea
-              value={motivacao}
-              onChange={e => setMotivacao(e.target.value)}
-              rows={2}
-              placeholder="Ex: Admiro a atuação da empresa em projetos de infraestrutura sustentável..."
-              className="w-full bg-gray-700 border border-gray-600 rounded px-2 py-1.5 text-sm text-white resize-none"
-            />
+            <label className="block text-xs text-gray-500 mb-1.5">Por que essa empresa? <span className="text-gray-700">(opcional)</span></label>
+            <textarea value={motivacao} onChange={e => setMotivacao(e.target.value)} rows={3}
+              placeholder="Admiro a atuação da empresa em..."
+              className="w-full bg-gray-900 border border-gray-700 rounded-xl px-3 py-2 text-sm text-white resize-none focus:outline-none focus:border-blue-600" />
           </div>
 
-          <button
-            onClick={handleGerarCarta}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded text-sm font-medium"
-          >
-            Gerar Carta
+          <button onClick={handleGerar}
+            className="w-full py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-sm font-medium transition-colors flex items-center justify-center gap-2">
+            <Wand2 size={14} />
+            Gerar carta
           </button>
         </div>
-      </section>
 
-      {carta && (
-        <section className="bg-gray-800 rounded-lg p-4">
-          <div className="flex justify-between items-center mb-3">
-            <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wide">Carta Gerada</h3>
-            <button
-              onClick={handleCopiar}
-              className={`text-xs px-3 py-1 rounded transition-colors ${copiado ? 'bg-green-700 text-green-100' : 'bg-gray-600 hover:bg-gray-500 text-white'}`}
-            >
-              {copiado ? 'Copiado!' : 'Copiar texto'}
-            </button>
+        {/* Preview */}
+        <div className="bg-gray-800 rounded-2xl border border-gray-700 p-4 flex flex-col">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-sm font-semibold text-gray-200">Prévia</h3>
+            {carta && (
+              <button onClick={handleCopiar}
+                className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg font-medium transition-colors ${
+                  copiado ? 'bg-green-700 text-green-100' : 'bg-gray-700 hover:bg-gray-600 text-gray-300'
+                }`}>
+                {copiado ? <><Check size={12} /> Copiado!</> : <><Copy size={12} /> Copiar</>}
+              </button>
+            )}
           </div>
-          <textarea
-            value={carta}
-            onChange={e => setCarta(e.target.value)}
-            rows={22}
-            className="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-sm text-gray-200 resize-none font-mono leading-relaxed"
-          />
-          <p className="text-xs text-gray-500 mt-2">Você pode editar o texto acima antes de copiar.</p>
-        </section>
-      )}
+
+          {carta ? (
+            <textarea value={carta} onChange={e => setCarta(e.target.value)} rows={18}
+              className="flex-1 w-full bg-gray-900 border border-gray-700 rounded-xl px-3 py-3 text-xs text-gray-300 resize-none font-mono leading-relaxed focus:outline-none focus:border-blue-600" />
+          ) : (
+            <div className="flex-1 flex flex-col items-center justify-center text-center py-10 border-2 border-dashed border-gray-700 rounded-xl">
+              <p className="text-4xl mb-3">✉️</p>
+              <p className="text-gray-500 text-sm">Preencha os campos ao lado<br/>e clique em <strong className="text-gray-400">Gerar carta</strong></p>
+            </div>
+          )}
+          {carta && <p className="text-xs text-gray-600 mt-2 text-center">Edite o texto acima antes de copiar</p>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ReadOnly({ label, value, placeholder }: { label: string; value: string; placeholder: string }) {
+  return (
+    <div>
+      <label className="block text-xs text-gray-500 mb-1.5">{label}</label>
+      <div className="bg-gray-900/50 border border-gray-800 rounded-xl px-3 py-2 text-sm text-gray-500 truncate">
+        {value || placeholder}
+      </div>
+    </div>
+  );
+}
+
+function CI({ label, value, onChange, placeholder }: { label: string; value: string; onChange: (v: string) => void; placeholder?: string }) {
+  return (
+    <div>
+      <label className="block text-xs text-gray-500 mb-1.5">{label}</label>
+      <input value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder}
+        className="w-full bg-gray-900 border border-gray-700 rounded-xl px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-blue-600" />
     </div>
   );
 }

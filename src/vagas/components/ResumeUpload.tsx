@@ -204,53 +204,75 @@ export function ResumeUpload({ onCurriculumParsed, onSkillsAdded, currentPerfil 
   const canClick = step === 'idle' || step === 'done' || step === 'error';
 
   return (
-    <div className="space-y-3 mb-6">
+    <div className="space-y-3">
       {/* Currículo */}
       <div
         onDragOver={e => { e.preventDefault(); setDragOver(true); }}
         onDragLeave={() => setDragOver(false)}
         onDrop={e => handleDrop(e, 'cv')}
         onClick={() => canClick && cvRef.current?.click()}
-        className={`border-2 border-dashed rounded-lg p-5 text-center transition-colors ${
+        className={`border-2 border-dashed rounded-2xl p-6 text-center transition-all ${
           canClick ? 'cursor-pointer' : 'cursor-default'
-        } ${dragOver ? 'border-blue-400 bg-blue-900/20' : 'border-gray-600 hover:border-gray-500'}`}
+        } ${dragOver
+          ? 'border-blue-500 bg-blue-950/40'
+          : step === 'done'
+            ? 'border-green-700 bg-green-950/20'
+            : 'border-gray-700 hover:border-gray-500 bg-gray-800/50'
+        }`}
       >
         <input ref={cvRef} type="file" accept=".pdf,.docx" className="hidden" onChange={e => handleFileChange(e, 'cv')} />
 
         {step === 'idle' && (
           <>
-            <p className="text-2xl mb-1">📄</p>
-            <p className="text-sm text-gray-300 font-medium">Arraste seu currículo ou clique para selecionar</p>
-            <p className="text-xs text-gray-500 mt-1">PDF ou DOCX — preenchimento automático do perfil</p>
+            <div className="w-12 h-12 rounded-2xl bg-blue-950 border border-blue-800 flex items-center justify-center mx-auto mb-3">
+              <span className="text-2xl">📄</span>
+            </div>
+            <p className="text-sm font-medium text-gray-200 mb-1">Arraste seu currículo aqui</p>
+            <p className="text-xs text-gray-500">PDF ou DOCX — preenche o perfil automaticamente</p>
+            <span className="inline-block mt-3 text-xs bg-gray-700 hover:bg-gray-600 text-gray-300 px-3 py-1.5 rounded-lg transition-colors">
+              Ou clique para selecionar
+            </span>
           </>
         )}
 
-        {step === 'extracting' && (
-          <p className="text-sm text-blue-300 animate-pulse">Lendo arquivo...</p>
-        )}
-
-        {step === 'parsing' && (
-          <p className="text-sm text-yellow-300 animate-pulse">Analisando currículo...</p>
+        {(step === 'extracting' || step === 'parsing') && (
+          <div>
+            <div className="w-12 h-12 rounded-2xl bg-blue-950 border border-blue-800 flex items-center justify-center mx-auto mb-3 animate-pulse">
+              <span className="text-2xl">⚙️</span>
+            </div>
+            <p className="text-sm text-blue-300 font-medium">
+              {step === 'extracting' ? 'Lendo arquivo...' : 'Analisando currículo...'}
+            </p>
+            <p className="text-xs text-gray-600 mt-1">Aguarde um momento</p>
+          </div>
         )}
 
         {step === 'done' && (
           <div>
-            <p className="text-green-400 font-medium text-sm mb-1">
+            <div className="w-12 h-12 rounded-2xl bg-green-950 border border-green-800 flex items-center justify-center mx-auto mb-3">
+              <span className="text-2xl">✅</span>
+            </div>
+            <p className="text-sm font-medium text-green-400 mb-1">
               Perfil preenchido!
-              <span className={`ml-2 text-xs px-1.5 py-0.5 rounded ${source === 'ia' ? 'bg-blue-800 text-blue-200' : 'bg-gray-700 text-gray-300'}`}>
-                {source === 'ia' ? '✨ com IA' : '🔍 local'}
+              <span className={`ml-2 text-xs px-2 py-0.5 rounded-full ${
+                source === 'ia' ? 'bg-blue-900 text-blue-300' : 'bg-gray-700 text-gray-400'
+              }`}>
+                {source === 'ia' ? '✨ com IA' : '🔍 automático'}
               </span>
             </p>
-            <p className="text-xs text-gray-400">{filledFields.join(' · ')}</p>
-            <p className="text-xs text-gray-500 mt-2 underline cursor-pointer">Clique para enviar outro currículo</p>
+            <p className="text-xs text-gray-500">{filledFields.join(' · ')}</p>
+            <p className="text-xs text-gray-600 mt-2 underline">Clique para enviar outro arquivo</p>
           </div>
         )}
 
         {step === 'error' && (
           <div onClick={e => e.stopPropagation()}>
-            <p className="text-red-400 text-sm mb-1">Não foi possível ler o arquivo</p>
-            <p className="text-xs text-gray-500">Verifique se o arquivo é PDF ou DOCX válido</p>
-            <button onClick={() => setStep('idle')} className="mt-2 text-xs text-blue-400 hover:underline">
+            <div className="w-12 h-12 rounded-2xl bg-red-950 border border-red-800 flex items-center justify-center mx-auto mb-3">
+              <span className="text-2xl">❌</span>
+            </div>
+            <p className="text-sm text-red-400 font-medium mb-1">Não foi possível ler o arquivo</p>
+            <p className="text-xs text-gray-600 mb-3">Verifique se é um PDF ou DOCX válido</p>
+            <button onClick={() => setStep('idle')} className="text-xs bg-gray-700 hover:bg-gray-600 text-white px-3 py-1.5 rounded-lg transition-colors">
               Tentar novamente
             </button>
           </div>
@@ -263,29 +285,33 @@ export function ResumeUpload({ onCurriculumParsed, onSkillsAdded, currentPerfil 
         onDragLeave={() => setDragOverCert(false)}
         onDrop={e => handleDrop(e, 'cert')}
         onClick={() => certRef.current?.click()}
-        className={`border border-dashed rounded-lg px-4 py-3 text-center cursor-pointer transition-colors ${
-          dragOverCert ? 'border-purple-400 bg-purple-900/20' : 'border-gray-700 hover:border-gray-600'
+        className={`border border-dashed rounded-2xl px-4 py-3 flex items-center justify-center gap-2 cursor-pointer transition-all ${
+          dragOverCert ? 'border-purple-500 bg-purple-950/30' : 'border-gray-800 hover:border-gray-700 bg-gray-900/30'
         }`}
       >
         <input ref={certRef} type="file" accept=".pdf,.docx" className="hidden" onChange={e => handleFileChange(e, 'cert')} />
-        <p className="text-xs text-gray-400">
-          {certProcessing ? '🔄 Analisando certificado...' : '🏅 Arraste certificados para extrair habilidades'}
+        <span className="text-sm">{certProcessing ? '🔄' : '🏅'}</span>
+        <p className="text-xs text-gray-500">
+          {certProcessing ? 'Analisando certificado...' : 'Arraste certificados para extrair habilidades'}
         </p>
       </div>
 
-      {/* Habilidades pendentes de certificados */}
+      {/* Habilidades pendentes */}
       {pendingSkills.length > 0 && (
-        <div className="bg-purple-900/30 border border-purple-700 rounded-lg p-3">
-          <p className="text-xs text-purple-300 font-medium mb-2">Habilidades extraídas dos certificados:</p>
-          <div className="flex flex-wrap gap-1 mb-3">
+        <div className="bg-purple-950/30 border border-purple-800 rounded-2xl p-4">
+          <p className="text-xs font-medium text-purple-300 mb-3">
+            🏅 {pendingSkills.length} habilidades extraídas dos certificados:
+          </p>
+          <div className="flex flex-wrap gap-1.5 mb-3">
             {pendingSkills.map(s => (
-              <span key={s} className="bg-purple-800 text-purple-100 text-xs px-2 py-0.5 rounded flex items-center gap-1">
+              <span key={s} className="flex items-center gap-1.5 bg-purple-900/50 border border-purple-800 text-purple-200 text-xs px-2.5 py-1 rounded-full">
                 {s}
-                <button onClick={() => setPendingSkills(p => p.filter(x => x !== s))} className="text-purple-400 hover:text-red-300">×</button>
+                <button onClick={() => setPendingSkills(p => p.filter(x => x !== s))} className="text-purple-500 hover:text-red-400 leading-none">×</button>
               </span>
             ))}
           </div>
-          <button onClick={() => { onSkillsAdded(pendingSkills); setPendingSkills([]); }} className="text-xs px-3 py-1 bg-purple-700 hover:bg-purple-600 text-white rounded">
+          <button onClick={() => { onSkillsAdded(pendingSkills); setPendingSkills([]); }}
+            className="text-xs px-4 py-2 bg-purple-700 hover:bg-purple-600 text-white rounded-xl font-medium transition-colors">
             Adicionar ao perfil
           </button>
         </div>
