@@ -60,7 +60,7 @@ export function CandidaturasTab() {
       />
 
       {/* Kanban */}
-      <div className="flex gap-3 overflow-x-auto pb-2" style={{ minHeight: 400 }}>
+      <div className="kanban-scroll flex gap-3 pb-2" style={{ minHeight: 400 }}>
         {COLUNAS.map(status => {
           const cards = byStatus(status);
           return (
