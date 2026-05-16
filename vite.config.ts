@@ -3,14 +3,16 @@ import react from '@vitejs/plugin-react'
 
 export default defineConfig({
   plugins: [react()],
+  optimizeDeps: {
+    exclude: ['pdfjs-dist'],
+  },
   server: {
     port: 5173,
     strictPort: true,
     proxy: {
-      '/api/loteria': {
-        target: 'https://servicebus2.caixa.gov.br',
+      '/.netlify/functions': {
+        target: 'http://localhost:8888',
         changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api\/loteria/, '/portaldeloterias/api'),
       },
     },
   },

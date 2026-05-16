@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { useVagasStore } from '../store/useVagasStore';
 import type { ExperienciaItem, FormacaoItem } from '../types';
+import { ResumeUpload } from '../components/ResumeUpload';
+import type { ParsedCurriculum } from '../components/ResumeUpload';
 
 const ESTADOS_BR = ['AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO'];
 
@@ -51,8 +53,29 @@ export function PerfilTab() {
     setShowFormForm(false);
   };
 
+  const handleCurriculumParsed = (data: ParsedCurriculum) => {
+    const patch: Partial<typeof perfil> = {};
+    if (data.nome) patch.nome = data.nome;
+    if (data.email) patch.email = data.email;
+    if (data.telefone) patch.telefone = data.telefone;
+    if (data.cidade) patch.cidade = data.cidade;
+    if (data.estado) patch.estado = data.estado;
+    if (data.linkedin) patch.linkedin = data.linkedin;
+    if (data.crea) patch.crea = data.crea;
+    if (data.resumo) patch.resumo = data.resumo;
+    if (Object.keys(patch).length) updatePerfil(patch);
+    data.habilidades?.forEach(h => h && addHabilidade(h));
+    data.experiencias?.forEach(e => e.empresa && addExperiencia(e));
+    data.formacoes?.forEach(f => f.instituicao && addFormacao(f));
+  };
+
   return (
     <div className="space-y-6 max-w-3xl">
+      <ResumeUpload
+        onCurriculumParsed={handleCurriculumParsed}
+        onSkillsAdded={(skills) => skills.forEach(s => addHabilidade(s))}
+        currentPerfil={perfil}
+      />
       {/* Dados pessoais */}
       <section className="bg-gray-800 rounded-lg p-4">
         <h3 className="text-sm font-semibold text-gray-300 mb-3 uppercase tracking-wide">Dados Pessoais</h3>
