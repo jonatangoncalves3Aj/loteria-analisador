@@ -1,104 +1,56 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap');
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 * {
   box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+html {
+  background: #030712;
+  overscroll-behavior: none;
 }
 
 body {
   margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  background: #f8fafc;
-  color: #1e293b;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', sans-serif;
+  background: #030712;
+  color: #f9fafb;
+  padding-top: env(safe-area-inset-top);
+  -webkit-font-smoothing: antialiased;
+  overscroll-behavior: none;
 }
 
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-::-webkit-scrollbar-track {
-  background: #f1f5f9;
-}
-::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
-  border-radius: 4px;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
+.safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
+.pb-safe     { padding-bottom: calc(5rem + env(safe-area-inset-bottom)); }
+
+@media (pointer: fine) {
+  ::-webkit-scrollbar { width: 4px; height: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #374151; border-radius: 99px; }
 }
 
-/* ===== Forja Mental theme ===== */
-
-.bg-cosmos {
-  background: radial-gradient(ellipse at 20% 50%, #1a1040 0%, transparent 50%),
-              radial-gradient(ellipse at 80% 20%, #0d2a30 0%, transparent 50%),
-              #0a0e27;
+button, a, [role="button"] {
+  -webkit-tap-highlight-color: transparent;
 }
 
-@layer components {
-  .btn-primary {
-    @apply px-6 py-3 rounded-2xl font-medium transition-all duration-300
-           bg-forja-primary text-forja-bg hover:brightness-110 active:scale-95;
-  }
-
-  .btn-ghost {
-    @apply px-6 py-3 rounded-2xl font-medium transition-all duration-300
-           border border-forja-primary/40 text-forja-primary hover:bg-forja-primary/10 active:scale-95;
-  }
-
-  .module-card {
-    @apply flex flex-col items-center gap-3 p-6 rounded-3xl
-           bg-forja-surface border border-white/5
-           cursor-pointer transition-all duration-300
-           hover:border-forja-primary/40 hover:shadow-lg hover:-translate-y-1
-           active:scale-95;
-  }
-
-  .slider {
-    @apply w-full h-2 rounded-full appearance-none cursor-pointer;
-    background: linear-gradient(to right, #a29bfe var(--val, 70%), #12183a var(--val, 70%));
-  }
-
-  .slider::-webkit-slider-thumb {
-    @apply appearance-none w-5 h-5 rounded-full bg-forja-primary cursor-pointer;
-    box-shadow: 0 0 10px #a29bfe88;
-  }
-
-  .state-pill {
-    @apply px-4 py-1.5 rounded-full text-sm font-medium border transition-all duration-200 cursor-pointer;
-  }
-
-  .state-pill.active {
-    @apply bg-forja-primary text-forja-bg border-forja-primary;
-  }
-
-  .state-pill.inactive {
-    @apply border-white/20 text-forja-muted hover:border-forja-primary/50;
-  }
+.kanban-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
 }
+.kanban-scroll::-webkit-scrollbar { display: none; }
 
-.mandala-ring {
-  transform-origin: center;
-  animation: spin var(--dur, 20s) linear infinite var(--dir, normal);
-  opacity: 0.15;
+@keyframes slideUp {
+  from { transform: translateY(100%); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
 }
+.slide-up { animation: slideUp 0.25s ease; }
 
-.breathing-circle {
-  transition: transform 0.1s;
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
-
-.emdr-dot {
-  box-shadow: 0 0 20px #a29bfe, 0 0 40px #a29bfe55;
-}
-
-@keyframes typeIn {
-  from { opacity: 0; transform: translateY(8px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-
-.text-appear {
-  animation: typeIn 0.6s ease forwards;
-}
+.fade-in { animation: fadeIn 0.2s ease; }
