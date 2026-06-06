@@ -32,8 +32,8 @@ function sleep(ms) {
   return new Promise(r => setTimeout(r, ms));
 }
 
-function parseNumbers(data, isSuperSete) {
-  if (isSuperSete) {
+function parseNumbers(data, game) {
+  if (game.isSuperSete) {
     if (!data.colunas) return [];
     return data.colunas.flatMap(col => col.dezenas.map(n => parseInt(n, 10)));
   }
@@ -46,13 +46,22 @@ function parseNumbers(data, isSuperSete) {
   return src.map(n => parseInt(n, 10)).filter(n => !isNaN(n));
 }
 
-async function fetchDraw(slug, contest, isSuperSete) {
+// Dupla Sena has 2 draws of 6 per contest. Split into 2 separate records.
+function splitDuplaSena(draw, pick) {
+  if (draw.numbers.length <= pick) return [draw];
+  return [
+    { ...draw, numbers: draw.numbers.slice(0, pick) },
+    { ...draw, numbers: draw.numbers.slice(pick, pick * 2) },
+  ];
+}
+
+async function fetchDraw(slug, contest, game) {
   const url = `${BASE_URL}/${slug}/${contest ?? ''}`;
   try {
     const res = await fetch(url, { headers: HEADERS });
     if (!res.ok) return null;
     const data = await res.json();
-    const numbers = parseNumbers(data, isSuperSete);
+    const numbers = parseNumbers(data, game);
     if (numbers.length === 0) return null;
     return { contest: data.numero, date: data.dataApuracao, numbers };
   } catch {
@@ -63,7 +72,7 @@ async function fetchDraw(slug, contest, isSuperSete) {
 async function fetchGame(game) {
   console.log(`\n🎲 Buscando ${game.id}...`);
 
-  const latest = await fetchDraw(game.slug, undefined, game.isSuperSete);
+  const latest = await fetchDraw(game.slug, undefined, game);
   if (!latest) {
     console.log(`  ❌ Não foi possível buscar o último concurso de ${game.id}`);
     return [];
@@ -76,7 +85,7 @@ async function fetchGame(game) {
 
   for (let c = startContest; c < latest.contest; c++) {
     await sleep(DELAY_MS);
-    const draw = await fetchDraw(game.slug, c, game.isSuperSete);
+    const draw = await fetchDraw(game.slug, c, game);
     if (draw) { results.push(draw); ok++; }
     else fail++;
     if ((ok + fail) % 50 === 0) {
@@ -84,8 +93,13 @@ async function fetchGame(game) {
     }
   }
 
+  const sorted = results.sort((a, b) => b.contest - a.contest);
+  // Dupla Sena: split each contest's 12 numbers into two draws of 6
+  if (game.id === 'duplasena') {
+    return sorted.flatMap(d => splitDuplaSena(d, game.pick));
+  }
   console.log(`  ✓ ${results.length} concursos obtidos (${fail} falhas)`);
-  return results.sort((a, b) => b.contest - a.contest);
+  return sorted;
 }
 
 async function main() {
