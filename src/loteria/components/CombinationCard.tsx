@@ -34,6 +34,23 @@ export function CombinationCard({ combination, index, game }: Props) {
             ))}
       </div>
 
+      {/* +Milionária trevos */}
+      {game.hasTrevo && combination.trevos && combination.trevos.length > 0 && (
+        <div className="flex items-center gap-2 mb-3">
+          <span className="text-[11px] text-gray-400 font-medium">🍀 Trevos:</span>
+          <div className="flex gap-1.5">
+            {combination.trevos.map((t) => (
+              <span
+                key={t}
+                className="bg-gradient-to-br from-pink-500 to-purple-600 text-white w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold shadow-sm"
+              >
+                {t}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div className="flex flex-wrap gap-1 mt-1">
         {combination.rationale.split(' · ').map((part, i) => (
           <span

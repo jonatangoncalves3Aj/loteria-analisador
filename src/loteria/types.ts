@@ -10,12 +10,17 @@ export interface GameConfig {
   isSuperSete?: boolean;
   // Days of week with draws: 0=Sun 1=Mon 2=Tue 3=Wed 4=Thu 5=Fri 6=Sat
   drawDays: number[];
+  // +Milionária trevos (1–6, pick 2)
+  hasTrevo?: boolean;
+  trevoCount?: number;
+  maxTrevo?: number;
 }
 
 export interface DrawResult {
   contest: number;
   date: string;
   numbers: number[];
+  trevos?: number[]; // +Milionária only
 }
 
 export interface NumberStats {
@@ -34,6 +39,7 @@ export interface Combination {
   targetDate?: string;
   contestLabel?: string;
   diversityRank?: number;
+  trevos?: number[]; // +Milionária only
 }
 
 export interface SuperSeteColumnStats {
@@ -119,5 +125,19 @@ export const GAMES: GameConfig[] = [
     bgColor: 'bg-blue-600',
     isSuperSete: true,
     drawDays: [3, 6], // Quarta e Sábado
+  },
+  {
+    id: 'maismilionaria',
+    name: '+Milionária',
+    apiSlug: 'maismilionaria',
+    minNum: 1,
+    maxNum: 50,
+    pickCount: 6,
+    color: 'text-pink-700',
+    bgColor: 'bg-pink-600',
+    drawDays: [3, 6], // Quarta e Sábado
+    hasTrevo: true,
+    trevoCount: 2,
+    maxTrevo: 6,
   },
 ];

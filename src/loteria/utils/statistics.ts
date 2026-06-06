@@ -254,6 +254,53 @@ export function computeTerminalDigitFreq(draws: DrawResult[]): TerminalDigitFreq
   return { freq };
 }
 
+// Trevo stats for +Milionária (trevos 1–6, pick 2)
+export function computeTrevoStats(draws: DrawResult[]): NumberStats[] {
+  const total = draws.length;
+  if (total === 0) return [];
+  const rawFreq: Record<number, number> = {};
+  const weightedFreq: Record<number, number> = {};
+  const lastSeen: Record<number, number> = {};
+  for (let n = 1; n <= 6; n++) { rawFreq[n] = 0; weightedFreq[n] = 0; lastSeen[n] = 0; }
+
+  draws.forEach((draw, idx) => {
+    const w = Math.pow(DECAY, idx);
+    (draw.trevos ?? []).forEach((n) => {
+      rawFreq[n] = (rawFreq[n] ?? 0) + 1;
+      weightedFreq[n] = (weightedFreq[n] ?? 0) + w;
+      if (!lastSeen[n]) lastSeen[n] = draw.contest;
+    });
+  });
+
+  const latestContest = draws[0]?.contest ?? 0;
+  const allWF = Object.values(weightedFreq);
+  const avgWF = allWF.reduce((a, b) => a + b, 0) / allWF.length;
+  const fullTotalWeight = draws.reduce((acc, _, idx) => acc + Math.pow(DECAY, idx), 0);
+  const recentDraws = draws.slice(0, RECENT_WINDOW);
+  const recentTotalWeight = recentDraws.reduce((acc, _, idx) => acc + Math.pow(DECAY, idx), 0);
+  const recentWF: Record<number, number> = {};
+  for (let n = 1; n <= 6; n++) recentWF[n] = 0;
+  recentDraws.forEach((draw, idx) => {
+    const w = Math.pow(DECAY, idx);
+    (draw.trevos ?? []).forEach((n) => { recentWF[n] = (recentWF[n] ?? 0) + w; });
+  });
+
+  return Array.from({ length: 6 }, (_, i) => {
+    const n = i + 1;
+    const wf = weightedFreq[n];
+    const d = lastSeen[n] === 0 ? total : latestContest - lastSeen[n];
+    const temp: 'hot' | 'warm' | 'cold' =
+      wf >= avgWF * 1.15 && d <= avgWF * 0.9 ? 'hot' :
+      wf < avgWF * 0.85 || d > avgWF * 1.6 ? 'cold' : 'warm';
+    const recentRate = recentTotalWeight > 0 ? recentWF[n] / recentTotalWeight : 0;
+    const historicalRate = fullTotalWeight > 0 ? wf / fullTotalWeight : 0;
+    const ratio = historicalRate === 0 ? (recentRate > 0 ? 2 : 1) : recentRate / historicalRate;
+    const trend: 'rising' | 'stable' | 'falling' =
+      ratio >= 1.3 ? 'rising' : ratio <= 0.7 ? 'falling' : 'stable';
+    return { number: n, frequency: rawFreq[n], delay: d, lastSeen: lastSeen[n], temp, trend };
+  });
+}
+
 export function computeSuperSeteColumnStats(draws: DrawResult[], columns = 7): NumberStats[][] {
   return Array.from({ length: columns }, (_, col) => {
     const colDraws: DrawResult[] = draws.map((d) => ({

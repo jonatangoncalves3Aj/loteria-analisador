@@ -7,13 +7,14 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const DATA_DIR = join(__dirname, '..', 'data');
 
 const GAMES = [
-  { id: 'megasena',   slug: 'megasena',   minNum: 1,  maxNum: 60,  pick: 6,  isSuperSete: false },
-  { id: 'lotofacil',  slug: 'lotofacil',  minNum: 1,  maxNum: 25,  pick: 15, isSuperSete: false },
-  { id: 'quina',      slug: 'quina',      minNum: 1,  maxNum: 80,  pick: 5,  isSuperSete: false },
-  { id: 'lotomania',  slug: 'lotomania',  minNum: 1,  maxNum: 100, pick: 50, isSuperSete: false },
-  { id: 'duplasena',  slug: 'duplasena',  minNum: 1,  maxNum: 50,  pick: 6,  isSuperSete: false },
-  { id: 'diadesorte', slug: 'diadesorte', minNum: 1,  maxNum: 31,  pick: 7,  isSuperSete: false },
-  { id: 'supersete',  slug: 'supersete',  minNum: 0,  maxNum: 9,   pick: 7,  isSuperSete: true  },
+  { id: 'megasena',       slug: 'megasena',       minNum: 1,  maxNum: 60,  pick: 6,  isSuperSete: false, hasTrevo: false },
+  { id: 'lotofacil',      slug: 'lotofacil',       minNum: 1,  maxNum: 25,  pick: 15, isSuperSete: false, hasTrevo: false },
+  { id: 'quina',          slug: 'quina',           minNum: 1,  maxNum: 80,  pick: 5,  isSuperSete: false, hasTrevo: false },
+  { id: 'lotomania',      slug: 'lotomania',       minNum: 1,  maxNum: 100, pick: 50, isSuperSete: false, hasTrevo: false },
+  { id: 'duplasena',      slug: 'duplasena',       minNum: 1,  maxNum: 50,  pick: 6,  isSuperSete: false, hasTrevo: false },
+  { id: 'diadesorte',     slug: 'diadesorte',      minNum: 1,  maxNum: 31,  pick: 7,  isSuperSete: false, hasTrevo: false },
+  { id: 'supersete',      slug: 'supersete',       minNum: 0,  maxNum: 9,   pick: 7,  isSuperSete: true,  hasTrevo: false },
+  { id: 'maismilionaria', slug: 'maismilionaria',  minNum: 1,  maxNum: 50,  pick: 6,  isSuperSete: false, hasTrevo: true  },
 ];
 
 const HISTORY_SIZE = 500;
@@ -37,6 +38,10 @@ function parseNumbers(data, game) {
     if (!data.colunas) return [];
     return data.colunas.flatMap(col => col.dezenas.map(n => parseInt(n, 10)));
   }
+  // +Milionária: use listaDezenas (6 main numbers, ignores trevos)
+  if (game.hasTrevo) {
+    return (data.listaDezenas ?? []).map(n => parseInt(n, 10)).filter(n => !isNaN(n));
+  }
   const src =
     data.dezenasSorteadasOrdemSorteio ??
     data.dezenas ??
@@ -44,6 +49,11 @@ function parseNumbers(data, game) {
     data.dezenasSorteadasPrimeiroPremio ??
     [];
   return src.map(n => parseInt(n, 10)).filter(n => !isNaN(n));
+}
+
+function parseTrevos(data, game) {
+  if (!game.hasTrevo) return undefined;
+  return (data.trevosSorteados ?? []).map(n => parseInt(n, 10)).filter(n => !isNaN(n));
 }
 
 // Dupla Sena has 2 draws of 6 per contest. Split into 2 separate records.
@@ -63,7 +73,10 @@ async function fetchDraw(slug, contest, game) {
     const data = await res.json();
     const numbers = parseNumbers(data, game);
     if (numbers.length === 0) return null;
-    return { contest: data.numero, date: data.dataApuracao, numbers };
+    const trevos = parseTrevos(data, game);
+    const record = { contest: data.numero, date: data.dataApuracao, numbers };
+    if (trevos && trevos.length > 0) record.trevos = trevos;
+    return record;
   } catch {
     return null;
   }

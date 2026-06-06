@@ -12,6 +12,7 @@ import {
   computeSuperSeteColumnStats,
   computeRepeatStats,
   computeTerminalDigitFreq,
+  computeTrevoStats,
 } from '../utils/statistics';
 import { generateCombinations, generateSuperSeteCombinations } from '../utils/generator';
 import { getNextDrawDate, toInputDate, fromInputDate, formatDrawDate } from '../utils/drawSchedule';
@@ -29,6 +30,7 @@ interface LoteriaState {
   draws: DrawResult[];
   stats: NumberStats[];
   columnStats: NumberStats[][];
+  trevoStats: NumberStats[];
   distribution: DistributionStats;
   pairStats: PairFrequency;
   sumStats: SumStats;
@@ -54,6 +56,31 @@ interface LoteriaState {
   setTargetDate: (dateInput: string) => void;
 }
 
+// Pick top-weighted trevos for +Milionária
+function pickTrevos(trevoStats: NumberStats[], count: number): number[] {
+  // Weight by frequency + temp boost + trend boost (same formula as generator)
+  const weighted = trevoStats
+    .map((s) => ({
+      n: s.number,
+      w: s.frequency * (s.temp === 'hot' ? 1.5 : s.temp === 'warm' ? 1.0 : 0.6) *
+         (s.trend === 'rising' ? 1.2 : s.trend === 'falling' ? 0.85 : 1.0),
+    }))
+    .sort((a, b) => b.w - a.w);
+  // Slightly randomize: pick from top 4 to avoid always same pair
+  const pool = weighted.slice(0, Math.min(4, weighted.length));
+  const selected = new Set<number>();
+  while (selected.size < count && selected.size < pool.length) {
+    const pick = pool[Math.floor(Math.random() * pool.length)];
+    selected.add(pick.n);
+  }
+  // Fill if needed
+  for (const t of weighted) {
+    if (selected.size >= count) break;
+    selected.add(t.n);
+  }
+  return Array.from(selected).sort((a, b) => a - b);
+}
+
 function resolveDrawDate(game: GameConfig, inputStr: string): string {
   const from = fromInputDate(inputStr);
   const next = getNextDrawDate(game, from);
@@ -71,6 +98,7 @@ export const useLoteriaStore = create<LoteriaState>((set, get) => ({
   draws: [],
   stats: [],
   columnStats: [],
+  trevoStats: [],
   distribution: emptyDist,
   pairStats: {},
   sumStats: emptySum,
@@ -90,7 +118,7 @@ export const useLoteriaStore = create<LoteriaState>((set, get) => ({
   selectGame: (game) => {
     const { targetDateInput } = get();
     set({
-      selectedGame: game, draws: [], stats: [], columnStats: [],
+      selectedGame: game, draws: [], stats: [], columnStats: [], trevoStats: [],
       pairStats: {}, sumStats: emptySum, rangeDist: { slots: [] }, weightedFreq: {},
       combinations: [], error: null,
       resolvedDrawDate: resolveDrawDate(game, targetDateInput),
@@ -120,9 +148,10 @@ export const useLoteriaStore = create<LoteriaState>((set, get) => ({
       const weightedFreq = computeWeightedFreq(draws, selectedGame);
       const repeatStats = selectedGame.isSuperSete ? emptyRepeat : computeRepeatStats(draws);
       const terminalDigitFreq = selectedGame.isSuperSete ? emptyTerminal : computeTerminalDigitFreq(draws);
+      const trevoStats = selectedGame.hasTrevo ? computeTrevoStats(draws) : [];
 
       set({
-        draws, stats, columnStats, distribution,
+        draws, stats, columnStats, trevoStats, distribution,
         pairStats, sumStats, rangeDist, weightedFreq,
         repeatStats, terminalDigitFreq,
         loading: false,
@@ -134,7 +163,7 @@ export const useLoteriaStore = create<LoteriaState>((set, get) => ({
 
   generateCombs: () => {
     const {
-      stats, columnStats, distribution, selectedGame, combinationCount,
+      stats, columnStats, trevoStats, distribution, selectedGame, combinationCount,
       resolvedDrawDate, pairStats, sumStats, rangeDist, weightedFreq,
       repeatStats, terminalDigitFreq,
     } = get();
@@ -147,6 +176,13 @@ export const useLoteriaStore = create<LoteriaState>((set, get) => ({
         pairStats, sumStats, rangeDist, weightedFreq,
         repeatStats, terminalDigitFreq,
       );
+      // Attach trevo suggestions for +Milionária
+      if (selectedGame.hasTrevo && trevoStats.length > 0) {
+        combinations = combinations.map((c) => ({
+          ...c,
+          trevos: pickTrevos(trevoStats, selectedGame.trevoCount ?? 2),
+        }));
+      }
     }
     combinations = combinations.map((c) => ({ ...c, targetDate: resolvedDrawDate }));
     set({ combinations, activeTab: 'combinations' });

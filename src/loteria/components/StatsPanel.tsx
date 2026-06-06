@@ -5,7 +5,7 @@ import { NumberHeatGrid } from './NumberHeatGrid';
 type SortKey = 'number' | 'frequency' | 'delay' | 'temp' | 'trend';
 
 export function StatsPanel() {
-  const { stats, draws, selectedGame, distribution, columnStats, sumStats, rangeDist, repeatStats } = useLoteriaStore();
+  const { stats, draws, selectedGame, distribution, columnStats, trevoStats, sumStats, rangeDist, repeatStats } = useLoteriaStore();
   const [sortKey, setSortKey] = useState<SortKey>('frequency');
   const [sortAsc, setSortAsc] = useState(false);
   const [view, setView] = useState<'grid' | 'table'>('grid');
@@ -144,6 +144,39 @@ export function StatsPanel() {
           <p className="text-xs text-gray-400 mt-2">
             O gerador tenta equilibrar as combinações respeitando essa distribuição.
           </p>
+        </div>
+      )}
+
+      {/* +Milionária trevo stats */}
+      {selectedGame.hasTrevo && trevoStats.length > 0 && (
+        <div className="bg-white rounded-xl border border-gray-200 p-4">
+          <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
+            🍀 Frequência dos Trevos (1–6)
+          </h3>
+          <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+            {trevoStats.map((s) => (
+              <div
+                key={s.number}
+                className={`rounded-xl p-3 text-center border ${
+                  s.temp === 'hot' ? 'bg-red-50 border-red-200' :
+                  s.temp === 'cold' ? 'bg-blue-50 border-blue-200' :
+                  'bg-gray-50 border-gray-200'
+                }`}
+              >
+                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-pink-500 to-purple-600 text-white flex items-center justify-center text-lg font-bold mx-auto mb-1 shadow">
+                  {s.number}
+                </div>
+                <p className="text-xs font-semibold text-gray-700">{s.frequency}x</p>
+                <p className="text-[10px] text-gray-400">{s.delay} conc.</p>
+                <span className={`text-[10px] font-medium ${
+                  s.trend === 'rising' ? 'text-green-600' :
+                  s.trend === 'falling' ? 'text-blue-600' : 'text-gray-400'
+                }`}>
+                  {s.trend === 'rising' ? '↑ Alta' : s.trend === 'falling' ? '↓ Queda' : '→'}
+                </span>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
