@@ -2,26 +2,34 @@ import { useState } from 'react';
 import { useLoteriaStore } from '../store/useLoteriaStore';
 import { NumberHeatGrid } from './NumberHeatGrid';
 
-type SortKey = 'number' | 'frequency' | 'delay' | 'temp';
+type SortKey = 'number' | 'frequency' | 'delay' | 'temp' | 'trend';
 
 export function StatsPanel() {
-  const { stats, draws, selectedGame, distribution, columnStats, sumStats, rangeDist } = useLoteriaStore();
+  const { stats, draws, selectedGame, distribution, columnStats, sumStats, rangeDist, repeatStats } = useLoteriaStore();
   const [sortKey, setSortKey] = useState<SortKey>('frequency');
   const [sortAsc, setSortAsc] = useState(false);
   const [view, setView] = useState<'grid' | 'table'>('grid');
 
   if (stats.length === 0) return null;
 
+  const trendOrder = { rising: 0, stable: 1, falling: 2 };
+
   const sorted = [...stats].sort((a, b) => {
-    const v = sortKey === 'temp'
-      ? (['hot', 'warm', 'cold'].indexOf(a.temp) - ['hot', 'warm', 'cold'].indexOf(b.temp))
-      : (a[sortKey] as number) - (b[sortKey] as number);
+    let v: number;
+    if (sortKey === 'temp') {
+      v = ['hot', 'warm', 'cold'].indexOf(a.temp) - ['hot', 'warm', 'cold'].indexOf(b.temp);
+    } else if (sortKey === 'trend') {
+      v = trendOrder[a.trend] - trendOrder[b.trend];
+    } else {
+      v = (a[sortKey] as number) - (b[sortKey] as number);
+    }
     return sortAsc ? v : -v;
   });
 
   const hot = stats.filter((s) => s.temp === 'hot').length;
   const warm = stats.filter((s) => s.temp === 'warm').length;
   const cold = stats.filter((s) => s.temp === 'cold').length;
+  const rising = stats.filter((s) => s.trend === 'rising').length;
 
   function toggleSort(key: SortKey) {
     if (sortKey === key) setSortAsc(!sortAsc);
@@ -55,6 +63,26 @@ export function StatsPanel() {
         </div>
       )}
 
+      {/* Repeat & Trend cards */}
+      {repeatStats.avgRepeat > 0 && (
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+          <StatCard
+            label="Repetição média do sorteio anterior"
+            value={`~${repeatStats.avgRepeat.toFixed(1)} dezenas`}
+            color="text-indigo-600"
+          />
+          <StatCard
+            label="Dezenas em alta (últimos 15)"
+            value={rising}
+            color="text-green-600"
+          />
+          <StatCard
+            label="Último sorteio (n° dezenas)"
+            value={repeatStats.lastDrawNumbers.length}
+          />
+        </div>
+      )}
+
       {/* Sum stats */}
       {sumStats.mean > 0 && (
         <div className="bg-white rounded-xl border border-gray-200 p-4">
@@ -63,12 +91,10 @@ export function StatsPanel() {
           </h3>
           <div className="flex items-center gap-4 flex-wrap">
             <div className="flex-1 min-w-48">
-              {/* Visual range bar */}
               <div className="relative h-6 bg-gray-100 rounded-full overflow-hidden">
                 {(() => {
                   const min = sumStats.p10;
                   const max = sumStats.p90;
-                  const total = sumStats.p90 + sumStats.p10 * 0.5;
                   const leftPct = (min / (min + max)) * 100;
                   const widthPct = ((max - min) / (min + max)) * 100;
                   return (
@@ -170,6 +196,7 @@ export function StatsPanel() {
                     {th('frequency', 'Frequência')}
                     {th('delay', 'Atraso')}
                     {th('temp', 'Temperatura')}
+                    {th('trend', 'Tendência')}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
@@ -190,6 +217,9 @@ export function StatsPanel() {
                       <td className="px-3 py-1.5 text-gray-600">{s.delay} concursos</td>
                       <td className="px-3 py-1.5">
                         <TempBadge temp={s.temp} />
+                      </td>
+                      <td className="px-3 py-1.5">
+                        <TrendBadge trend={s.trend} />
                       </td>
                     </tr>
                   ))}
@@ -222,6 +252,20 @@ function TempBadge({ temp }: { temp: 'hot' | 'warm' | 'cold' }) {
   return (
     <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${map[temp]}`}>
       {label[temp]}
+    </span>
+  );
+}
+
+function TrendBadge({ trend }: { trend: 'rising' | 'stable' | 'falling' }) {
+  const map = {
+    rising: 'bg-green-100 text-green-700',
+    stable: 'bg-gray-100 text-gray-600',
+    falling: 'bg-blue-100 text-blue-700',
+  };
+  const label = { rising: '↑ Em alta', stable: '→ Estável', falling: '↓ Em queda' };
+  return (
+    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${map[trend]}`}>
+      {label[trend]}
     </span>
   );
 }

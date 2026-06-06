@@ -30,11 +30,23 @@ export interface RangeDistribution {
   slots: RangeSlot[];
 }
 
+// Repetition from previous draw stats
+export interface RepeatStats {
+  avgRepeat: number;         // avg number of digits that repeat from draw N-1 to draw N
+  lastDrawNumbers: number[]; // numbers from the most recent draw (draws[0])
+}
+
+// Terminal digit (units digit) frequency
+export interface TerminalDigitFreq {
+  freq: Record<number, number>; // digit 0-9 → avg occurrences per draw
+}
+
 // ------------------------------------------------------------------
 // Decay factor: each draw older gets multiplied by this.
 // 0.97 → draw 100 contests ago weighs only ~5% of the latest draw.
 // ------------------------------------------------------------------
 const DECAY = 0.97;
+const RECENT_WINDOW = 15;
 
 export function computeStats(draws: DrawResult[], config: GameConfig): NumberStats[] {
   const total = draws.length;
@@ -60,6 +72,22 @@ export function computeStats(draws: DrawResult[], config: GameConfig): NumberSta
     });
   });
 
+  // Recent window weighted frequency (last RECENT_WINDOW draws)
+  const recentWeightedFreq: Record<number, number> = {};
+  for (let n = config.minNum; n <= config.maxNum; n++) recentWeightedFreq[n] = 0;
+
+  const recentDraws = draws.slice(0, RECENT_WINDOW);
+  recentDraws.forEach((draw, idx) => {
+    const w = Math.pow(DECAY, idx);
+    draw.numbers.forEach((n) => {
+      recentWeightedFreq[n] = (recentWeightedFreq[n] ?? 0) + w;
+    });
+  });
+
+  // Normalize by total weight so comparison is rate-based
+  const recentTotalWeight = recentDraws.reduce((acc, _, idx) => acc + Math.pow(DECAY, idx), 0);
+  const fullTotalWeight = draws.reduce((acc, _, idx) => acc + Math.pow(DECAY, idx), 0);
+
   const latestContest = draws[0]?.contest ?? 0;
   const delay: Record<number, number> = {};
   for (let n = config.minNum; n <= config.maxNum; n++) {
@@ -81,12 +109,27 @@ export function computeStats(draws: DrawResult[], config: GameConfig): NumberSta
     } else {
       temp = 'warm';
     }
+
+    // Trend detection: compare recent rate vs. historical rate
+    const recentRate = recentTotalWeight > 0 ? recentWeightedFreq[n] / recentTotalWeight : 0;
+    const historicalRate = fullTotalWeight > 0 ? weightedFreq[n] / fullTotalWeight : 0;
+    let trend: 'rising' | 'stable' | 'falling';
+    if (historicalRate === 0) {
+      trend = recentRate > 0 ? 'rising' : 'stable';
+    } else {
+      const ratio = recentRate / historicalRate;
+      if (ratio >= 1.3) trend = 'rising';
+      else if (ratio <= 0.7) trend = 'falling';
+      else trend = 'stable';
+    }
+
     stats.push({
       number: n,
-      frequency: rawFreq[n],           // raw count for display
+      frequency: rawFreq[n],
       delay: d,
       lastSeen: lastSeen[n],
       temp,
+      trend,
     });
   }
   return stats;
@@ -173,6 +216,42 @@ export function computeDistribution(draws: DrawResult[], config: GameConfig): Di
     avgLow: totalLow / n,
     avgHigh: (draws[0].numbers.length * n - totalLow) / n,
   };
+}
+
+// Average number of digits that repeat from one draw to the next
+export function computeRepeatStats(draws: DrawResult[]): RepeatStats {
+  if (draws.length < 2) {
+    return { avgRepeat: 0, lastDrawNumbers: draws[0]?.numbers ?? [] };
+  }
+  let totalRepeats = 0;
+  for (let i = 0; i < draws.length - 1; i++) {
+    const prevSet = new Set(draws[i + 1].numbers); // draw N-1 (older = higher index)
+    const current = draws[i].numbers;               // draw N  (newer = lower index)
+    const repeats = current.filter((n) => prevSet.has(n)).length;
+    totalRepeats += repeats;
+  }
+  return {
+    avgRepeat: totalRepeats / (draws.length - 1),
+    lastDrawNumbers: draws[0].numbers,
+  };
+}
+
+// Average count of each terminal digit (0-9) per draw
+export function computeTerminalDigitFreq(draws: DrawResult[]): TerminalDigitFreq {
+  if (draws.length === 0) return { freq: {} };
+  const digitTotals: Record<number, number> = {};
+  for (let d = 0; d <= 9; d++) digitTotals[d] = 0;
+  draws.forEach((draw) => {
+    draw.numbers.forEach((n) => {
+      const digit = n % 10;
+      digitTotals[digit]++;
+    });
+  });
+  const freq: Record<number, number> = {};
+  for (let d = 0; d <= 9; d++) {
+    freq[d] = digitTotals[d] / draws.length;
+  }
+  return { freq };
 }
 
 export function computeSuperSeteColumnStats(draws: DrawResult[], columns = 7): NumberStats[][] {

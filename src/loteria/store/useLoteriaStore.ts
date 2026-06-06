@@ -10,6 +10,8 @@ import {
   computeSumStats,
   computeRangeDistribution,
   computeSuperSeteColumnStats,
+  computeRepeatStats,
+  computeTerminalDigitFreq,
 } from '../utils/statistics';
 import { generateCombinations, generateSuperSeteCombinations } from '../utils/generator';
 import { getNextDrawDate, toInputDate, fromInputDate, formatDrawDate } from '../utils/drawSchedule';
@@ -18,6 +20,8 @@ import type {
   PairFrequency,
   SumStats,
   RangeDistribution,
+  RepeatStats,
+  TerminalDigitFreq,
 } from '../utils/statistics';
 
 interface LoteriaState {
@@ -30,6 +34,8 @@ interface LoteriaState {
   sumStats: SumStats;
   rangeDist: RangeDistribution;
   weightedFreq: Record<number, number>;
+  repeatStats: RepeatStats;
+  terminalDigitFreq: TerminalDigitFreq;
   combinations: Combination[];
   loading: boolean;
   error: string | null;
@@ -57,6 +63,8 @@ function resolveDrawDate(game: GameConfig, inputStr: string): string {
 const todayInput = toInputDate(new Date());
 const emptySum: SumStats = { mean: 0, stdDev: 0, p10: 0, p90: 0 };
 const emptyDist: DistributionStats = { avgEven: 0, avgOdd: 0, avgConsecutive: 0, avgLow: 0, avgHigh: 0 };
+const emptyRepeat: RepeatStats = { avgRepeat: 0, lastDrawNumbers: [] };
+const emptyTerminal: TerminalDigitFreq = { freq: {} };
 
 export const useLoteriaStore = create<LoteriaState>((set, get) => ({
   selectedGame: GAMES[0],
@@ -68,6 +76,8 @@ export const useLoteriaStore = create<LoteriaState>((set, get) => ({
   sumStats: emptySum,
   rangeDist: { slots: [] },
   weightedFreq: {},
+  repeatStats: emptyRepeat,
+  terminalDigitFreq: emptyTerminal,
   combinations: [],
   loading: false,
   error: null,
@@ -84,6 +94,8 @@ export const useLoteriaStore = create<LoteriaState>((set, get) => ({
       pairStats: {}, sumStats: emptySum, rangeDist: { slots: [] }, weightedFreq: {},
       combinations: [], error: null,
       resolvedDrawDate: resolveDrawDate(game, targetDateInput),
+      repeatStats: emptyRepeat,
+      terminalDigitFreq: emptyTerminal,
     });
     get().loadHistory();
   },
@@ -106,7 +118,15 @@ export const useLoteriaStore = create<LoteriaState>((set, get) => ({
         ? { slots: [] }
         : computeRangeDistribution(draws, selectedGame);
       const weightedFreq = computeWeightedFreq(draws, selectedGame);
-      set({ draws, stats, columnStats, distribution, pairStats, sumStats, rangeDist, weightedFreq, loading: false });
+      const repeatStats = selectedGame.isSuperSete ? emptyRepeat : computeRepeatStats(draws);
+      const terminalDigitFreq = selectedGame.isSuperSete ? emptyTerminal : computeTerminalDigitFreq(draws);
+
+      set({
+        draws, stats, columnStats, distribution,
+        pairStats, sumStats, rangeDist, weightedFreq,
+        repeatStats, terminalDigitFreq,
+        loading: false,
+      });
     } catch {
       set({ loading: false, error: 'Erro ao carregar histórico de concursos.' });
     }
@@ -116,6 +136,7 @@ export const useLoteriaStore = create<LoteriaState>((set, get) => ({
     const {
       stats, columnStats, distribution, selectedGame, combinationCount,
       resolvedDrawDate, pairStats, sumStats, rangeDist, weightedFreq,
+      repeatStats, terminalDigitFreq,
     } = get();
     let combinations: Combination[];
     if (selectedGame.isSuperSete) {
@@ -124,6 +145,7 @@ export const useLoteriaStore = create<LoteriaState>((set, get) => ({
       combinations = generateCombinations(
         stats, distribution, selectedGame, combinationCount,
         pairStats, sumStats, rangeDist, weightedFreq,
+        repeatStats, terminalDigitFreq,
       );
     }
     combinations = combinations.map((c) => ({ ...c, targetDate: resolvedDrawDate }));

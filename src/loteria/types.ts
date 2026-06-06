@@ -24,6 +24,7 @@ export interface NumberStats {
   delay: number;
   lastSeen: number;
   temp: 'hot' | 'warm' | 'cold';
+  trend: 'rising' | 'stable' | 'falling';
 }
 
 export interface Combination {
@@ -32,6 +33,7 @@ export interface Combination {
   rationale: string;
   targetDate?: string;
   contestLabel?: string;
+  diversityRank?: number;
 }
 
 export interface SuperSeteColumnStats {

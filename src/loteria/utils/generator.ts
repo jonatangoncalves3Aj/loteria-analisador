@@ -4,6 +4,8 @@ import type {
   PairFrequency,
   SumStats,
   RangeDistribution,
+  RepeatStats,
+  TerminalDigitFreq,
 } from './statistics';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -13,11 +15,13 @@ function weightedSample(
   weightedFreq: Record<number, number>,
   count: number
 ): number[] {
-  // Weights: base weight from weighted frequency + temperature boost
+  if (pool.length === 0 || count <= 0) return [];
+  // Weights: base weight from weighted frequency + temperature boost + trend boost
   const weights = pool.map((s) => {
     const wf = weightedFreq[s.number] ?? 1;
     const tempBoost = s.temp === 'hot' ? 1.5 : s.temp === 'warm' ? 1.0 : 0.6;
-    return wf * tempBoost;
+    const trendBoost = s.trend === 'rising' ? 1.2 : s.trend === 'falling' ? 0.85 : 1.0;
+    return wf * tempBoost * trendBoost;
   });
   const totalWeight = weights.reduce((a, b) => a + b, 0);
   const selected = new Set<number>();
@@ -97,6 +101,34 @@ function rangeBalanceScore(nums: number[], rangeDist: RangeDistribution): number
   return score;
 }
 
+// Terminal digit penalty: -6 pts per number beyond 2 sharing the same units digit
+function terminalDigitPenalty(nums: number[], termFreq: TerminalDigitFreq): number {
+  if (!termFreq || Object.keys(termFreq.freq).length === 0) return 0;
+  const digitCount: Record<number, number> = {};
+  for (const n of nums) {
+    const d = n % 10;
+    digitCount[d] = (digitCount[d] ?? 0) + 1;
+  }
+  let penalty = 0;
+  for (const d in digitCount) {
+    const count = digitCount[d];
+    if (count >= 3) {
+      penalty += (count - 2) * 6;
+    }
+  }
+  return penalty;
+}
+
+// Jaccard similarity between two number arrays
+function jaccardSimilarity(a: number[], b: number[]): number {
+  const setA = new Set(a);
+  const setB = new Set(b);
+  let intersection = 0;
+  for (const n of setA) { if (setB.has(n)) intersection++; }
+  const union = setA.size + setB.size - intersection;
+  return union === 0 ? 0 : intersection / union;
+}
+
 // ─── Main scorer ────────────────────────────────────────────────────────────
 
 function scoreCombination(
@@ -108,6 +140,7 @@ function scoreCombination(
   sumStats: SumStats,
   rangeDist: RangeDistribution,
   weightedFreq: Record<number, number>,
+  termFreq: TerminalDigitFreq,
 ): { score: number; rationale: string } {
   const statsMap = new Map(stats.map((s) => [s.number, s]));
   const hot = nums.filter((n) => statsMap.get(n)?.temp === 'hot').length;
@@ -146,25 +179,39 @@ function scoreCombination(
   else if (lowDiff <= 1.5) score += 5;
   else if (lowDiff > 3) score -= 6;
 
-  // 5. SOMA histórica — NOVO (max 20 pts)
+  // 5. SOMA histórica (max 20 pts)
   const sumScore = Math.round(sumProximityScore(nums, sumStats) * 20);
   score += sumScore;
   if (sumScore >= 16) parts.push(`soma ${combinationSum} ✓`);
   else if (sumScore < 8) parts.push(`soma ${combinationSum} fora da faixa`);
 
-  // 6. EQUILÍBRIO DE FAIXA — NOVO (max 20 pts)
+  // 6. EQUILÍBRIO DE FAIXA (max 20 pts)
   const rb = rangeBalanceScore(nums, rangeDist);
   const rbNorm = Math.min(20, Math.max(-10, rb));
   score += rbNorm;
   if (rbNorm >= 15) parts.push('faixas balanceadas ✓');
 
-  // 7. AFINIDADE DE PARES — NOVO (bonus até +10 pts)
+  // 7. AFINIDADE DE PARES (bonus até +10 pts)
   if (Object.keys(pairs).length > 0) {
     const maxPossibleAff = Math.max(...Object.values(pairs));
     const aff = pairAffinityScore(nums, pairs);
     const affNorm = Math.min(10, Math.round((aff / (maxPossibleAff || 1)) * 10));
     score += affNorm;
     if (affNorm >= 7) parts.push('pares frequentes ✓');
+  }
+
+  // 8. TENDÊNCIA RECENTE (bonus até +8 pts, penalidade até -3 pts)
+  const rising = nums.filter((n) => statsMap.get(n)?.trend === 'rising').length;
+  const falling = nums.filter((n) => statsMap.get(n)?.trend === 'falling').length;
+  score += rising * 2;
+  score -= falling * 1;
+  if (rising >= 2) parts.push(`${rising} em alta ✓`);
+
+  // 9. PENALIDADE DE DÍGITO TERMINAL (até -18 pts)
+  const tdPenalty = terminalDigitPenalty(nums, termFreq);
+  if (tdPenalty > 0) {
+    score -= tdPenalty;
+    parts.push(`dígitos repetidos -${tdPenalty}`);
   }
 
   // Normalize 0–100
@@ -191,6 +238,8 @@ export function generateCombinations(
   sumStats: SumStats = { mean: 0, stdDev: 0, p10: 0, p90: 0 },
   rangeDist: RangeDistribution = { slots: [] },
   weightedFreq: Record<number, number> = {},
+  repeatStats: RepeatStats = { avgRepeat: 0, lastDrawNumbers: [] },
+  termFreq: TerminalDigitFreq = { freq: {} },
 ): Combination[] {
   // Ensure weightedFreq has all numbers
   const wf = { ...weightedFreq };
@@ -200,22 +249,38 @@ export function generateCombinations(
 
   const candidates: Combination[] = [];
   const attemptsPerCandidate = 8;
-  const totalAttempts = Math.max(count * 20, 80);
+  // 3.75× larger candidate pool for better selection quality
+  const totalAttempts = Math.max(count * 60, 300);
+
+  // Pre-compute forced repeat pool from last draw
+  const forcedRepeatCount = Math.round(repeatStats.avgRepeat);
+  const lastDrawSet = new Set(repeatStats.lastDrawNumbers);
+  const lastDrawPool = stats.filter((s) => lastDrawSet.has(s.number));
 
   for (let i = 0; i < totalAttempts; i++) {
-    // Generate a candidate via weighted sampling
-    let nums = weightedSample(stats, wf, config.pickCount);
+    // Force some numbers from the last draw to match historical repeat patterns
+    let forcedNums: number[] = [];
+    if (forcedRepeatCount > 0 && lastDrawPool.length > 0) {
+      const actualForced = Math.min(forcedRepeatCount, config.pickCount - 1);
+      forcedNums = weightedSample(lastDrawPool, wf, actualForced);
+    }
+
+    // Fill remaining slots from the full pool, excluding already-forced numbers
+    const forcedSet = new Set(forcedNums);
+    const remainingPool = stats.filter((s) => !forcedSet.has(s.number));
+    const remainingCount = config.pickCount - forcedNums.length;
+    const remainingNums = weightedSample(remainingPool, wf, remainingCount);
+
+    let nums = [...forcedNums, ...remainingNums];
 
     // Try to fix sum if out of range (up to attemptsPerCandidate swaps)
     for (let attempt = 0; attempt < attemptsPerCandidate; attempt++) {
       if (sumInRange(nums, sumStats)) break;
-      // Replace highest or lowest number to adjust sum
       const currentSum = nums.reduce((a, b) => a + b, 0);
       const sorted = [...nums].sort((a, b) => a - b);
       const numSet = new Set(nums);
 
       if (currentSum > sumStats.p90) {
-        // Replace highest with a lower random number
         const toReplace = sorted[sorted.length - 1];
         const candidates2 = stats
           .filter((s) => !numSet.has(s.number) && s.number < toReplace)
@@ -225,7 +290,6 @@ export function generateCombinations(
           nums = nums.map((n) => (n === toReplace ? pick.number : n));
         }
       } else if (currentSum < sumStats.p10) {
-        // Replace lowest with a higher random number
         const toReplace = sorted[0];
         const candidates2 = stats
           .filter((s) => !numSet.has(s.number) && s.number > toReplace)
@@ -237,21 +301,66 @@ export function generateCombinations(
       }
     }
 
-    const { score, rationale } = scoreCombination(nums, stats, dist, config, pairs, sumStats, rangeDist, wf);
+    const { score, rationale } = scoreCombination(
+      nums, stats, dist, config, pairs, sumStats, rangeDist, wf, termFreq,
+    );
     candidates.push({ numbers: [...nums].sort((a, b) => a - b), score, rationale });
   }
 
-  // Deduplicate and return top-scored
+  // Deduplicate and sort by score
   const seen = new Set<string>();
-  return candidates
+  const unique = candidates
     .filter((c) => {
       const key = c.numbers.join(',');
       if (seen.has(key)) return false;
       seen.add(key);
       return true;
     })
-    .sort((a, b) => b.score - a.score)
-    .slice(0, count);
+    .sort((a, b) => b.score - a.score);
+
+  if (unique.length === 0) return [];
+
+  // Diversity-aware selection using Jaccard similarity
+  const maxScore = unique[0].score;
+  const qualityFloor = maxScore * 0.75;
+  const JACCARD_THRESHOLD = 0.4;
+
+  const selected: Combination[] = [];
+
+  for (const candidate of unique) {
+    if (selected.length >= count) break;
+
+    if (selected.length === 0) {
+      selected.push({ ...candidate, diversityRank: 1 });
+      continue;
+    }
+
+    // Quality floor check
+    if (candidate.score < qualityFloor) break;
+
+    // Diversity check: must be sufficiently different from all already selected
+    const tooSimilar = selected.some(
+      (s) => jaccardSimilarity(candidate.numbers, s.numbers) >= JACCARD_THRESHOLD
+    );
+
+    if (!tooSimilar) {
+      selected.push({ ...candidate, diversityRank: selected.length + 1 });
+    }
+  }
+
+  // Fallback: fill with top remaining if diversity selection didn't reach count
+  if (selected.length < count) {
+    const selectedKeys = new Set(selected.map((s) => s.numbers.join(',')));
+    for (const candidate of unique) {
+      if (selected.length >= count) break;
+      if (!selectedKeys.has(candidate.numbers.join(','))) {
+        selected.push({ ...candidate, diversityRank: selected.length + 1 });
+        selectedKeys.add(candidate.numbers.join(','));
+      }
+    }
+  }
+
+  return selected;
 }
 
 export function generateSuperSeteCombinations(
